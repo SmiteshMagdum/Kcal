@@ -1,0 +1,1153 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      html {
+        scroll-padding-top: env(safe-area-inset-top, 0px);
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font:
+          14px -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        background: #fff;
+        color: #000;
+      }
+      img {
+        max-width: 100%;
+      }
+      [hidden]:not([hidden="until-found" i]) {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <title>Kcal Log</title>
+    <meta name="claude:viewport-fit-sides" content="cover" />
+    <style>
+      /* Layout: single narrow column, ring summary on top, add form, meal-grouped log, 7-day chart */
+      :root {
+        --bg: #f2f5f3;
+        --surface: #ffffff;
+        --fg: #14201c;
+        --muted: #5b6b65;
+        --line: #dce4e0;
+        --accent: #0e7c66;
+        --accent-fg: #ffffff;
+        --accent-soft: #ddf1ea;
+        --warn: #b45309;
+        --warn-soft: #fbebd3;
+        --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+        --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #0f1714;
+          --surface: #17221e;
+          --fg: #e6efeb;
+          --muted: #93a59d;
+          --line: #263530;
+          --accent: #3dd6ae;
+          --accent-fg: #06241c;
+          --accent-soft: #15332b;
+          --warn: #f59e0b;
+          --warn-soft: #3a2a0e;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #0f1714;
+        --surface: #17221e;
+        --fg: #e6efeb;
+        --muted: #93a59d;
+        --line: #263530;
+        --accent: #3dd6ae;
+        --accent-fg: #06241c;
+        --accent-soft: #15332b;
+        --warn: #f59e0b;
+        --warn-soft: #3a2a0e;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.45;
+        padding-block: 20px 48px;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+      }
+      main {
+        max-width: 560px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-display);
+        margin: 0;
+        text-wrap: balance;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .top h1 {
+        font-size: 22px;
+        letter-spacing: -0.01em;
+      }
+      .datenav {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .iconbtn {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+      }
+      .datelabel {
+        min-width: 104px;
+        text-align: center;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: 148px 1fr;
+        gap: 16px;
+        align-items: center;
+      }
+      .ringwrap {
+        position: relative;
+        width: 148px;
+        height: 148px;
+      }
+      .ringwrap svg {
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+      }
+      .ringtxt {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      .ringtxt b {
+        font-family: var(--font-display);
+        font-size: 30px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      .ringtxt span {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .stats {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+      }
+      .stat {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: baseline;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 8px;
+      }
+      .stat:last-of-type {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+      .stat span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .stat b {
+        font-variant-numeric: tabular-nums;
+        font-family: var(--font-display);
+        font-size: 17px;
+      }
+      .stat b.over {
+        color: var(--warn);
+      }
+      .goalrow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .goalrow label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .goalrow input {
+        width: 92px;
+      }
+      label.f {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--muted);
+        min-width: 0;
+      }
+      input,
+      select {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 9px 10px;
+        min-width: 0;
+        width: 100%;
+        font-size: 16px;
+      }
+      .addgrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .addgrid .wide {
+        grid-column: 1 / -1;
+      }
+      .sugwrap {
+        position: relative;
+      }
+      .sug {
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        top: calc(100% + 4px);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+        overflow: hidden;
+      }
+      .sug button {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: 0;
+        padding: 10px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--line);
+      }
+      .sug button:last-child {
+        border-bottom: 0;
+      }
+      .sug button:hover,
+      .sug button:focus-visible {
+        background: var(--accent-soft);
+      }
+      .sug small {
+        color: var(--muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 8px 0 0;
+        min-height: 18px;
+      }
+      .addrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .total {
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-variant-numeric: tabular-nums;
+      }
+      .primary {
+        background: var(--accent);
+        color: var(--accent-fg);
+        border: 0;
+        border-radius: 12px;
+        padding: 11px 20px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .primary:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .chip {
+        background: var(--accent-soft);
+        color: var(--fg);
+        border: 0;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .sectitle {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 4px;
+      }
+      .sectitle h3 {
+        font-size: 15px;
+      }
+      .sectitle span {
+        color: var(--muted);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      .entry {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 0;
+        border-top: 1px solid var(--line);
+      }
+      .entry .nm {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .entry .nm small {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .entry b {
+        font-variant-numeric: tabular-nums;
+        font-family: var(--font-display);
+      }
+      .entry .del {
+        background: none;
+        border: 0;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 18px;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+      }
+      .entry .del:hover {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      .empty {
+        color: var(--muted);
+        text-align: center;
+        padding: 8px 0 4px;
+      }
+      .group + .group {
+        margin-top: 14px;
+      }
+      .chartbox {
+        overflow-x: auto;
+      }
+      .chartbox svg {
+        width: 100%;
+        height: auto;
+        display: block;
+        min-width: 300px;
+      }
+      .chartbox text {
+        fill: var(--muted);
+        font-family: var(--font-body);
+        font-size: 11px;
+      }
+      @media (max-width: 400px) {
+        .summary {
+          grid-template-columns: 1fr;
+          justify-items: center;
+        }
+        .stats {
+          width: 100%;
+        }
+        .addgrid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .ring-fg {
+          transition: stroke-dashoffset 0.5s ease;
+        }
+      }
+    </style>
+
+    <main>
+      <div class="top">
+        <h1>Kcal Log</h1>
+        <div class="datenav">
+          <button class="iconbtn" id="prev" aria-label="Previous day">
+            &#8249;
+          </button>
+          <div class="datelabel" id="datelabel"></div>
+          <button class="iconbtn" id="next" aria-label="Next day">
+            &#8250;
+          </button>
+        </div>
+      </div>
+
+      <section class="card summary" aria-label="Today's total">
+        <div class="ringwrap">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle
+              cx="60"
+              cy="60"
+              r="52"
+              fill="none"
+              stroke="var(--line)"
+              stroke-width="11"
+            ></circle>
+            <circle
+              id="ring"
+              class="ring-fg"
+              cx="60"
+              cy="60"
+              r="52"
+              fill="none"
+              stroke="var(--accent)"
+              stroke-width="11"
+              stroke-linecap="round"
+              stroke-dasharray="326.7"
+              stroke-dashoffset="326.7"
+            ></circle>
+          </svg>
+          <div class="ringtxt">
+            <b id="eaten">0</b><span id="ringsub">of 2000 kcal</span>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span>Eaten</span><b id="s-eaten">0</b></div>
+          <div class="stat">
+            <span id="s-remain-l">Remaining</span><b id="s-remain">2000</b>
+          </div>
+          <div class="goalrow">
+            <label for="goal">Daily goal (kcal)</label>
+            <input
+              id="goal"
+              type="number"
+              inputmode="numeric"
+              min="500"
+              max="10000"
+              step="50"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Add food">
+        <h2 style="font-size: 16px">Add food</h2>
+        <div class="addgrid">
+          <label class="f wide sugwrap"
+            >Food name
+            <input
+              id="name"
+              type="text"
+              autocomplete="off"
+              placeholder="e.g. paneer butter masala, banana, pizza"
+            />
+            <div class="sug" id="sug" hidden></div>
+          </label>
+          <label class="f"
+            >Quantity
+            <input
+              id="qty"
+              type="number"
+              inputmode="decimal"
+              min="0.25"
+              step="0.25"
+              value="1"
+            />
+          </label>
+          <label class="f"
+            >kcal per <span id="unitlbl">serving</span>
+            <input
+              id="per"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1"
+              placeholder="auto"
+            />
+          </label>
+          <label class="f"
+            >Meal
+            <select id="meal">
+              <option value="Breakfast">Breakfast</option>
+              <option value="Lunch">Lunch</option>
+              <option value="Snacks">Snacks</option>
+              <option value="Dinner">Dinner</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint" id="hint">
+          Type a food and pick a match. Calories are approximate and you can
+          edit them.
+        </p>
+        <div class="addrow">
+          <div class="total" id="total">0 kcal</div>
+          <button class="primary" id="add" disabled>Add</button>
+        </div>
+        <div class="chips" id="chips" aria-label="Quick add"></div>
+      </section>
+
+      <section class="card" id="log" aria-label="Food log"></section>
+
+      <section class="card" aria-label="Last 7 days">
+        <div class="sectitle">
+          <h3>Last 7 days</h3>
+          <span id="avg"></span>
+        </div>
+        <div class="chartbox">
+          <svg
+            id="chart"
+            viewBox="0 0 340 170"
+            role="img"
+            aria-label="Calories per day for the last 7 days"
+          ></svg>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      // name, kcal per unit, unit. Approximate values.
+      var FOODS = [
+        ["Roti / chapati (plain)", 100, "roti"],
+        ["Phulka", 70, "phulka"],
+        ["Paratha (plain)", 200, "paratha"],
+        ["Aloo paratha", 280, "paratha"],
+        ["Naan", 260, "naan"],
+        ["Butter naan", 320, "naan"],
+        ["Puri", 120, "puri"],
+        ["Bhatura", 300, "bhatura"],
+        ["White rice, cooked", 200, "cup"],
+        ["Brown rice, cooked", 215, "cup"],
+        ["Jeera rice", 250, "cup"],
+        ["Biryani (chicken)", 400, "plate"],
+        ["Veg biryani", 350, "plate"],
+        ["Pulao", 280, "cup"],
+        ["Khichdi", 250, "bowl"],
+        ["Curd rice", 220, "bowl"],
+        ["Lemon rice", 260, "cup"],
+        ["Dal (cooked)", 150, "bowl"],
+        ["Dal tadka", 180, "bowl"],
+        ["Dal makhani", 300, "bowl"],
+        ["Rajma", 230, "bowl"],
+        ["Chole", 270, "bowl"],
+        ["Sambar", 120, "bowl"],
+        ["Rasam", 60, "bowl"],
+        ["Kadhi", 160, "bowl"],
+        ["Paneer butter masala", 350, "bowl"],
+        ["Palak paneer", 280, "bowl"],
+        ["Kadai paneer", 320, "bowl"],
+        ["Paneer, raw", 260, "100 g"],
+        ["Butter chicken", 400, "bowl"],
+        ["Chicken curry", 280, "bowl"],
+        ["Tandoori chicken", 260, "2 pieces"],
+        ["Egg curry", 240, "bowl"],
+        ["Fish curry", 220, "bowl"],
+        ["Mutton curry", 360, "bowl"],
+        ["Aloo gobi", 160, "bowl"],
+        ["Bhindi masala", 130, "bowl"],
+        ["Baingan bharta", 150, "bowl"],
+        ["Mixed veg curry", 150, "bowl"],
+        ["Aloo sabzi", 180, "bowl"],
+        ["Idli", 40, "idli"],
+        ["Plain dosa", 130, "dosa"],
+        ["Masala dosa", 250, "dosa"],
+        ["Uttapam", 190, "uttapam"],
+        ["Medu vada", 150, "vada"],
+        ["Upma", 200, "bowl"],
+        ["Poha", 250, "plate"],
+        ["Dhokla", 80, "piece"],
+        ["Thepla", 110, "thepla"],
+        ["Besan chilla", 120, "chilla"],
+        ["Paneer sandwich", 300, "sandwich"],
+        ["Vada pav", 290, "vada pav"],
+        ["Pav bhaji", 400, "plate"],
+        ["Misal pav", 420, "plate"],
+        ["Samosa", 260, "samosa"],
+        ["Pakora / bhajiya", 50, "piece"],
+        ["Kachori", 190, "kachori"],
+        ["Pani puri", 35, "puri"],
+        ["Bhel puri", 250, "plate"],
+        ["Sev puri", 300, "plate"],
+        ["Maggi noodles", 350, "packet"],
+        ["Momos (steamed)", 35, "piece"],
+        ["Gulab jamun", 150, "piece"],
+        ["Jalebi", 150, "piece"],
+        ["Rasgulla", 120, "piece"],
+        ["Kheer", 250, "bowl"],
+        ["Halwa (suji)", 280, "bowl"],
+        ["Laddu", 190, "laddu"],
+        ["Barfi", 120, "piece"],
+        ["Ice cream", 140, "scoop"],
+        ["Chocolate", 50, "square"],
+        ["Dark chocolate", 170, "30 g"],
+        ["Chai with sugar and milk", 90, "cup"],
+        ["Black coffee", 5, "cup"],
+        ["Coffee with milk and sugar", 80, "cup"],
+        ["Lassi (sweet)", 220, "glass"],
+        ["Chaas / buttermilk", 40, "glass"],
+        ["Milk (full fat)", 150, "glass"],
+        ["Milk (toned)", 120, "glass"],
+        ["Coconut water", 45, "glass"],
+        ["Orange juice", 110, "glass"],
+        ["Sugarcane juice", 180, "glass"],
+        ["Cola", 140, "can"],
+        ["Beer", 150, "bottle"],
+        ["Banana", 105, "banana"],
+        ["Apple", 95, "apple"],
+        ["Mango", 200, "mango"],
+        ["Orange", 62, "orange"],
+        ["Papaya", 120, "cup"],
+        ["Watermelon", 45, "cup"],
+        ["Grapes", 100, "cup"],
+        ["Pomegranate", 130, "cup"],
+        ["Guava", 70, "guava"],
+        ["Pineapple", 80, "cup"],
+        ["Dates", 25, "date"],
+        ["Boiled egg", 78, "egg"],
+        ["Omelette (2 eggs)", 190, "omelette"],
+        ["Fried egg", 90, "egg"],
+        ["Egg bhurji", 200, "serving"],
+        ["Chicken breast, grilled", 165, "100 g"],
+        ["Fish, fried", 250, "piece"],
+        ["Tofu", 80, "100 g"],
+        ["Almonds", 7, "almond"],
+        ["Cashews", 9, "cashew"],
+        ["Peanuts", 160, "30 g"],
+        ["Peanut butter", 95, "tbsp"],
+        ["Roasted chana", 120, "30 g"],
+        ["Makhana (roasted)", 100, "cup"],
+        ["Sprouts salad", 110, "bowl"],
+        ["Cucumber salad", 30, "bowl"],
+        ["Green salad", 50, "bowl"],
+        ["Bread slice (white)", 75, "slice"],
+        ["Brown bread slice", 70, "slice"],
+        ["Butter", 36, "tsp"],
+        ["Ghee", 45, "tsp"],
+        ["Sugar", 16, "tsp"],
+        ["Oats with milk", 230, "bowl"],
+        ["Cornflakes with milk", 220, "bowl"],
+        ["Muesli", 200, "bowl"],
+        ["Yogurt / curd", 100, "bowl"],
+        ["Greek yogurt", 130, "bowl"],
+        ["Cheese slice", 70, "slice"],
+        ["Pizza", 285, "slice"],
+        ["Burger (veg)", 350, "burger"],
+        ["Burger (chicken)", 450, "burger"],
+        ["French fries", 365, "medium"],
+        ["Chicken sandwich", 380, "sandwich"],
+        ["Fried rice", 330, "cup"],
+        ["Hakka noodles", 380, "plate"],
+        ["Pasta (white sauce)", 420, "plate"],
+        ["Pasta (red sauce)", 330, "plate"],
+        ["Shawarma", 450, "roll"],
+        ["Kathi roll", 400, "roll"],
+        ["Chips (packet)", 150, "small packet"],
+        ["Biscuit", 50, "biscuit"],
+        ["Cake slice", 350, "slice"],
+        ["Protein shake", 150, "scoop"],
+        ["Whey protein", 120, "scoop"],
+      ];
+      var QUICK = [
+        "Roti / chapati (plain)",
+        "White rice, cooked",
+        "Dal (cooked)",
+        "Boiled egg",
+        "Banana",
+        "Chai with sugar and milk",
+        "Idli",
+        "Curd",
+      ];
+      var KEY = "kcal-log-v1";
+      var state = { goal: 2000, days: {} };
+      try {
+        var raw = localStorage.getItem(KEY);
+        if (raw) {
+          var p = JSON.parse(raw);
+          if (p && typeof p === "object") {
+            state.goal = +p.goal > 0 ? +p.goal : 2000;
+            state.days = p.days || {};
+          }
+        }
+      } catch (e) {}
+      function save() {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(state));
+        } catch (e) {}
+      }
+
+      var $ = function (id) {
+        return document.getElementById(id);
+      };
+      function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          }[c];
+        });
+      }
+      function keyOf(d) {
+        return (
+          d.getFullYear() +
+          "-" +
+          String(d.getMonth() + 1).padStart(2, "0") +
+          "-" +
+          String(d.getDate()).padStart(2, "0")
+        );
+      }
+      var cur = new Date();
+      cur.setHours(12, 0, 0, 0);
+      function dayTotal(k) {
+        return (state.days[k] || []).reduce(function (a, e) {
+          return a + e.kcal;
+        }, 0);
+      }
+      function fmt(n) {
+        return Math.round(n).toLocaleString("en-IN");
+      }
+
+      var picked = null; // selected food from list
+      function currentKcal() {
+        var per = parseFloat($("per").value),
+          q = parseFloat($("qty").value);
+        return per >= 0 && q > 0 ? Math.round(per * q) : 0;
+      }
+      function refreshForm() {
+        var k = currentKcal();
+        $("total").textContent = fmt(k) + " kcal";
+        $("add").disabled = !($("name").value.trim() && k > 0);
+      }
+
+      function showSug() {
+        var q = $("name").value.trim().toLowerCase(),
+          box = $("sug");
+        picked = null;
+        $("unitlbl").textContent = "serving";
+        if (!q) {
+          box.hidden = true;
+          refreshForm();
+          return;
+        }
+        var words = q.split(/\s+/);
+        var hits = FOODS.filter(function (f) {
+          var n = f[0].toLowerCase();
+          return words.every(function (w) {
+            return n.indexOf(w) > -1;
+          });
+        });
+        hits.sort(function (a, b) {
+          return (
+            (a[0].toLowerCase().indexOf(q) === 0 ? 0 : 1) -
+            (b[0].toLowerCase().indexOf(q) === 0 ? 0 : 1)
+          );
+        });
+        hits = hits.slice(0, 6);
+        if (!hits.length) {
+          box.hidden = true;
+          $("hint").textContent =
+            "Not in the list. Enter the calories per serving yourself.";
+          refreshForm();
+          return;
+        }
+        $("hint").textContent = "Pick a match to fill in approximate calories.";
+        box.innerHTML = hits
+          .map(function (f) {
+            return (
+              '<button type="button" data-n="' +
+              esc(f[0]) +
+              '"><span>' +
+              esc(f[0]) +
+              "</span><small>" +
+              f[1] +
+              " kcal / " +
+              esc(f[2]) +
+              "</small></button>"
+            );
+          })
+          .join("");
+        box.hidden = false;
+        refreshForm();
+      }
+      function pickFood(name) {
+        var f = FOODS.filter(function (x) {
+          return x[0] === name;
+        })[0];
+        if (!f) return;
+        picked = f;
+        $("name").value = f[0];
+        $("per").value = f[1];
+        $("unitlbl").textContent = f[2];
+        $("sug").hidden = true;
+        $("hint").textContent =
+          "Approximate: " +
+          f[1] +
+          " kcal per " +
+          f[2] +
+          ". Change the quantity or the number if yours differs.";
+        refreshForm();
+      }
+      $("name").addEventListener("input", showSug);
+      $("sug").addEventListener("click", function (e) {
+        var b = e.target.closest("button");
+        if (b) pickFood(b.getAttribute("data-n"));
+      });
+      document.addEventListener("click", function (e) {
+        if (!e.target.closest(".sugwrap")) $("sug").hidden = true;
+      });
+      $("qty").addEventListener("input", refreshForm);
+      $("per").addEventListener("input", refreshForm);
+
+      function addEntry(name, kcal, qty, unit, meal) {
+        var k = keyOf(cur);
+        (state.days[k] = state.days[k] || []).push({
+          id: Date.now() + Math.random(),
+          name: name,
+          kcal: Math.round(kcal),
+          qty: qty,
+          unit: unit,
+          meal: meal,
+        });
+        save();
+        render();
+      }
+      $("add").addEventListener("click", function () {
+        var name = $("name").value.trim(),
+          kcal = currentKcal();
+        if (!name || kcal <= 0) return;
+        addEntry(
+          name,
+          kcal,
+          parseFloat($("qty").value),
+          picked ? picked[2] : "serving",
+          $("meal").value,
+        );
+        $("name").value = "";
+        $("per").value = "";
+        $("qty").value = "1";
+        picked = null;
+        $("unitlbl").textContent = "serving";
+        $("hint").textContent = "Added. Type another food.";
+        refreshForm();
+      });
+      $("name").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (!$("sug").hidden) {
+            var b = $("sug").querySelector("button");
+            if (b) pickFood(b.getAttribute("data-n"));
+          } else if (!$("add").disabled) $("add").click();
+        }
+      });
+
+      $("chips").innerHTML = QUICK.map(function (n) {
+        var f = FOODS.filter(function (x) {
+          return x[0] === n;
+        })[0];
+        return (
+          '<button type="button" class="chip" data-n="' +
+          esc(n) +
+          '">+ ' +
+          esc(n.split(" (")[0]) +
+          "</button>"
+        );
+      }).join("");
+      $("chips").addEventListener("click", function (e) {
+        var b = e.target.closest(".chip");
+        if (!b) return;
+        pickFood(b.getAttribute("data-n"));
+        $("name").focus();
+      });
+
+      $("goal").value = state.goal;
+      $("goal").addEventListener("change", function () {
+        var g = parseInt($("goal").value, 10);
+        if (g >= 500 && g <= 10000) {
+          state.goal = g;
+          save();
+        } else {
+          $("goal").value = state.goal;
+        }
+        render();
+      });
+      $("prev").addEventListener("click", function () {
+        cur.setDate(cur.getDate() - 1);
+        render();
+      });
+      $("next").addEventListener("click", function () {
+        cur.setDate(cur.getDate() + 1);
+        render();
+      });
+
+      function dateLabel() {
+        var t = new Date();
+        t.setHours(12, 0, 0, 0);
+        var diff = Math.round((cur - t) / 86400000);
+        if (diff === 0) return "Today";
+        if (diff === -1) return "Yesterday";
+        if (diff === 1) return "Tomorrow";
+        return cur.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+        });
+      }
+
+      function render() {
+        var k = keyOf(cur),
+          list = state.days[k] || [],
+          eaten = dayTotal(k),
+          goal = state.goal;
+        $("datelabel").textContent = dateLabel();
+        $("eaten").textContent = fmt(eaten);
+        $("ringsub").textContent = "of " + fmt(goal) + " kcal";
+        $("s-eaten").textContent = fmt(eaten) + " kcal";
+        var left = goal - eaten,
+          over = left < 0;
+        $("s-remain-l").textContent = over ? "Over goal by" : "Remaining";
+        $("s-remain").textContent = fmt(Math.abs(left)) + " kcal";
+        $("s-remain").className = over ? "over" : "";
+        var frac = Math.min(eaten / goal, 1);
+        $("ring").setAttribute(
+          "stroke-dashoffset",
+          (326.7 * (1 - frac)).toFixed(1),
+        );
+        $("ring").setAttribute(
+          "stroke",
+          over ? "var(--warn)" : "var(--accent)",
+        );
+
+        var meals = ["Breakfast", "Lunch", "Snacks", "Dinner"],
+          html = "";
+        if (!list.length)
+          html =
+            '<div class="empty">Nothing logged for this day yet. Add a food above.</div>';
+        meals.forEach(function (m) {
+          var items = list.filter(function (e) {
+            return e.meal === m;
+          });
+          if (!items.length) return;
+          var sum = items.reduce(function (a, e) {
+            return a + e.kcal;
+          }, 0);
+          html +=
+            '<div class="group"><div class="sectitle"><h3>' +
+            m +
+            "</h3><span>" +
+            fmt(sum) +
+            " kcal</span></div>" +
+            items
+              .map(function (e) {
+                return (
+                  '<div class="entry"><div class="nm">' +
+                  esc(e.name) +
+                  "<small>" +
+                  e.qty +
+                  " &times; " +
+                  esc(e.unit) +
+                  "</small></div><b>" +
+                  fmt(e.kcal) +
+                  '</b><button class="del" data-id="' +
+                  e.id +
+                  '" aria-label="Remove ' +
+                  esc(e.name) +
+                  '">&times;</button></div>'
+                );
+              })
+              .join("") +
+            "</div>";
+        });
+        $("log").innerHTML = html;
+        drawChart();
+      }
+      $("log").addEventListener("click", function (e) {
+        var b = e.target.closest(".del");
+        if (!b) return;
+        var id = b.getAttribute("data-id"),
+          k = keyOf(cur);
+        state.days[k] = (state.days[k] || []).filter(function (x) {
+          return String(x.id) !== id;
+        });
+        save();
+        render();
+      });
+
+      function drawChart() {
+        var W = 340,
+          H = 170,
+          L = 34,
+          R = 8,
+          T = 12,
+          B = 26,
+          days = [],
+          i;
+        for (i = 6; i >= 0; i--) {
+          var d = new Date(cur);
+          d.setDate(d.getDate() - i);
+          days.push({ d: d, k: keyOf(d), v: dayTotal(keyOf(d)) });
+        }
+        var max = Math.max(
+          state.goal * 1.25,
+          Math.max.apply(
+            null,
+            days.map(function (x) {
+              return x.v;
+            }),
+          ) * 1.1,
+        );
+        max = Math.ceil(max / 500) * 500;
+        var y = function (v) {
+          return T + (H - T - B) * (1 - v / max);
+        };
+        var bw = (W - L - R) / 7,
+          s = "";
+        for (var t = 0; t <= max; t += 500) {
+          s +=
+            '<line x1="' +
+            L +
+            '" x2="' +
+            (W - R) +
+            '" y1="' +
+            y(t) +
+            '" y2="' +
+            y(t) +
+            '" stroke="var(--line)" stroke-width="1"/><text x="' +
+            (L - 6) +
+            '" y="' +
+            (y(t) + 4) +
+            '" text-anchor="end">' +
+            t +
+            "</text>";
+        }
+        days.forEach(function (x, idx) {
+          var bx = L + idx * bw + bw * 0.2,
+            w = bw * 0.6,
+            h = (H - T - B) * (x.v / max),
+            isCur = idx === 6;
+          var fill = x.v > state.goal ? "var(--warn)" : "var(--accent)";
+          if (x.v > 0)
+            s +=
+              '<rect x="' +
+              bx +
+              '" y="' +
+              y(x.v) +
+              '" width="' +
+              w +
+              '" height="' +
+              h +
+              '" rx="4" fill="' +
+              fill +
+              '" opacity="' +
+              (isCur ? 1 : 0.55) +
+              '"/>';
+          s +=
+            '<text x="' +
+            (bx + w / 2) +
+            '" y="' +
+            (H - 8) +
+            '" text-anchor="middle"' +
+            (isCur ? ' style="font-weight:700"' : "") +
+            ">" +
+            x.d.toLocaleDateString("en-IN", { weekday: "narrow" }) +
+            x.d.getDate() +
+            "</text>";
+        });
+        s +=
+          '<line x1="' +
+          L +
+          '" x2="' +
+          (W - R) +
+          '" y1="' +
+          y(state.goal) +
+          '" y2="' +
+          y(state.goal) +
+          '" stroke="var(--fg)" stroke-width="1.2" stroke-dasharray="4 3"/>';
+        $("chart").innerHTML = s;
+        var logged = days.filter(function (x) {
+          return x.v > 0;
+        });
+        $("avg").textContent = logged.length
+          ? "avg " +
+            fmt(
+              logged.reduce(function (a, x) {
+                return a + x.v;
+              }, 0) / logged.length,
+            ) +
+            " kcal"
+          : "dashed line = goal";
+      }
+      render();
+      refreshForm();
+    </script>
+  </body>
+</html>
