@@ -312,6 +312,19 @@ function drawChart() {
   var logged = days.filter(function (x) { return x.v > 0; });
   $("avg").textContent = logged.length ? "avg " + fmt(logged.reduce(function (a, x) { return a + x.v; }, 0) / logged.length) + " kcal" : "dashed line = goal";
 }
+var lastToday = keyOf(new Date());
+function checkDay() {
+  var n = new Date(); n.setHours(12, 0, 0, 0);
+  var nk = keyOf(n);
+  if (nk === lastToday) return;
+  var wasOnToday = keyOf(cur) === lastToday;
+  lastToday = nk;
+  if (wasOnToday) cur = n;
+  render();
+}
+document.addEventListener("visibilitychange", function () { if (!document.hidden) checkDay(); });
+window.addEventListener("focus", checkDay);
+setInterval(checkDay, 60000);
 render(); refreshForm();
 </script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
